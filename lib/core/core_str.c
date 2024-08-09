@@ -1,4 +1,4 @@
-/* String module for JustCoderdev Core library v2
+/* String module for JustCoderdev Core library v3
  * */
 
 #include <core.h>
@@ -71,6 +71,7 @@ void string_from_(String* string, char* text, n64 text_len, char* file, int line
 }
 
 void string_nterm_(String* string, char* file, int line) {
+	printf("%lu %lu\n", string->count, string->capacity);
 	if(string->count == 0 || string->chars[string->count - 1] != '\0') {
 #if DEBUG_STRING_ENABLE
 		printf("DEBUG: Null terminating string '"STR_FMT"' at %p...\n", STR(*string), string->chars);
@@ -114,11 +115,25 @@ void string_clear(String* string) {
 }
 
 void string_fmt(String* string, char* format, ...) {
+	int size;
 	va_list ptr;
+
 	va_start(ptr, format);
 
-	string->count = 1 + vsnprintf(string->chars,
-			string->capacity, format, ptr);
+	size = vsnprintf(string->chars, string->capacity, format, ptr);
+	assert(size > 0);
+
+	if(size >= string->capacity)
+	{
+
+#if DEBUG_STRING_ENABLE
+		printf("DEBUG: Truncated string_fmt result of \"%s\"\n", format);
+#endif
+
+		string->count = string->capacity - 1;
+	} else {
+		string->count = 1 + size;
+	}
 
 	va_end(ptr);
 }

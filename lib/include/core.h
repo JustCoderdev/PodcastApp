@@ -1,4 +1,4 @@
-/* JustCoderdev's Core library v6
+/* JustCoderdev's Core library v7
  * */
 
 #ifndef CORE_H_
@@ -45,12 +45,12 @@ typedef int Errno;
 typedef const char* CString;
 typedef struct String {
 	char* chars;
-	n64 count;
-	n64 capacity;
+	int count;
+	int capacity;
 } String;
 
 #define STR_FMT "%.*s"
-#define STR(STRING) (int)(STRING).count, (STRING).chars
+#define STR(STRING) (STRING).count, (STRING).chars
 
 #define string_new(STRING, CAPACITY) string_new_(STRING, CAPACITY, __FILE__, __LINE__)
 #define string_new_from(STRING, TEXT, TEXT_LEN) string_new_from_(STRING, TEXT, TEXT_LEN, __FILE__, __LINE__)
@@ -60,18 +60,19 @@ typedef struct String {
 #define string_append(STRING, CHR) string_append_(STRING, CHR, __FILE__, __LINE__)
 #define string_free(STRING) string_free_(STRING, __FILE__, __LINE__)
 
-extern void string_new_(String* string, n64 capacity, char* file, int line);
-extern void string_new_from_(String* string, char* text, n64 text_len, char* file, int line);
-extern void string_from_(String* string, char* text, n64 text_len, char* file, int line);
+/* TODO: use int instead of n64 and swap  char* with size */
+extern void string_new_(String* string, int capacity, char* file, int line);
+extern void string_new_from_(String* string, char* text, int text_len, char* file, int line);
+extern void string_from_(String* string, char* text, int text_len, char* file, int line);
 extern void string_nterm_(String* string, char* file, int line); /* Null terminate a string */
 extern void string_append_(String* string, char chr, char* file, int line);
 extern void string_free_(String* string, char* file, int line);
 
 extern void string_clear(String* string);
 extern void string_fmt(String* string, char* format, ...);
-extern void string_remove(String* string, n64 count);
+extern void string_remove(String* string, int count);
 
-extern bool string_equals(String strA, const char* strB, n64 strB_len);
+extern bool string_equals(String strA, const char* strB, int strB_len);
 extern bool string_equallit(String strA, const char* const strB);
 
 /* Memory debug */
@@ -94,10 +95,10 @@ extern void *realloc_(void* ptr, size_t size, char* file, int line);
 #define LOG_STREAM stdout
 #endif
 
-#define LOG_INFO   "INFO",   /*  FG_BLUE,    */ __FILE__, __LINE__, LOG_MODULE
-#define LOG_DEBUG  "DEBUG",  /*  FG_GREEN,   */ __FILE__, __LINE__, LOG_MODULE
-#define LOG_WARN   "WARN",   /*  FG_YELLOW,  */ __FILE__, __LINE__, LOG_MODULE
-#define LOG_ERROR  "ERROR",  /*  FG_RED,     */ __FILE__, __LINE__, LOG_MODULE
+#define CORE_INFO   "INFO",   /*  FG_BLUE,    */ __FILE__, __LINE__, LOG_MODULE
+#define CORE_DEBUG  "DEBUG",  /*  FG_GREEN,   */ __FILE__, __LINE__, LOG_MODULE
+#define CORE_WARN   "WARN",   /*  FG_YELLOW,  */ __FILE__, __LINE__, LOG_MODULE
+#define CORE_ERROR  "ERROR",  /*  FG_RED,     */ __FILE__, __LINE__, LOG_MODULE
 extern void core_log(CString level, /* CString color, */ CString file,
 		int line, CString module, CString format, ...);
 
@@ -169,11 +170,12 @@ extern n64 buffer_copy_until_str(char *delimiter, n64 del_len,
 
 /* Dinamic array fast implementation --------------------------- */
 
-/* typedef struct Array { */
-/* 	void* items; */
+/* typedef struct VoidArray { */
+/* 	char* items; */
+/* 	char item_size; */
 /* 	n64 count; */
 /* 	n64 capacity; */
-/* } Array; */
+/* } VoidArray; */
 
 #define arr_new(arr, cap) \
 	do { \

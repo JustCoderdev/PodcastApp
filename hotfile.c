@@ -65,7 +65,7 @@ const Color CLR_BACKG = {  30,  30,  30, 255 };
 
 char tick_string[TICK_STR_LEN] = {0};
 char fps_string[FPS_STR_LEN] = {0};
-void ntos(n32 number, n32 len, const char* string) {
+void ntos(n32 number, n32 len, char* string) {
 	n64 i;
 
 	for(i = 0; i < len - 1; ++i) {
@@ -87,6 +87,14 @@ void ntos(n32 number, n32 len, const char* string) {
 }
 
 void init_fn(HGL_State* state) {
+	int i;
+
+	state->palette.fcolor = CLR_FOREG;
+	state->palette.bcolor = CLR_BACKG;
+
+	for(i = 0; i < 255; ++i)
+		arr_append(&state->events, i);
+
 	printf("Loaded module!\n");
 }
 
@@ -120,16 +128,55 @@ void draw_bar(Rectangle bbox, n64* progress, n64 total, n64 visible_items, Palet
 	DrawRectangleRec(cursor, palette.fcolor);
 }
 
-void draw_list(Rectangle bbox, HGL_State* state, Palette palette)
+void swap(void* A, void* B) {
+	void* T = A;
+	A = B;
+	B = A;
+}
+
+typedef struct ViewState {
+	int hovering: 1;
+	int selected: 1;
+} ViewState;
+
+typedef void (*DrawElementFunc)(Rectangle bbox, void* elements, n64 element_id, ViewState state, Palette palette);
+void draw_int(Rectangle bbox, void* elements, n64 element_id,
+              ViewState state, Palette palette)
+{
+	Color fcolor = palette.fcolor;
+	Color bcolor = palette.bcolor;
+
+	/* Draw background */
+	if(state.hovering) { fcolor = RED; bcolor = DARK_RED; }
+	if(state.selected) swap(&fcolor, &bcolor);
+	DrawRectangleRec(bbox, bcolor);
+	DrawRectangleLinesEx(bbox, HBORD, state.selected ? bcolor : fcolor);
+
+	/* */
+	{
+		String buffer = {0};
+		int number = ((int*)elements)[element_id];
+		string_fmt(&buffer, "%d", number);
+		string_nterm(&buffer);
+
+		DrawText(buffer.chars, bbox.x + bbox.height / 2 - FONT_SIZE/2,
+				bbox.y + PAD, FONT_SIZE, fcolor);
+
+		string_free(&buffer);
+	}
+}
+
+void draw_list(Rectangle bbox, n64* offset, void* elements, n64 elements_count,
+               DrawElementFunc draw_element_func, Palette palette)
 {
 	Vector2 mouse = GetMousePosition();
 
-	n8 visible_events_count;
-	Rectangle event_bbox = {0};
-	event_bbox.x = bbox.x + PAD;
-	event_bbox.width = bbox.width - BAR_WIDTH - DPAD - HPAD;
-	event_bbox.height = FONT_SIZE * 2 + PAD;
-	visible_events_count = (bbox.height - DPAD) / (event_bbox.height + PAD);
+	n8 visible_elements_count;
+	Rectangle element_bbox = {0};
+	element_bbox.x = bbox.x + PAD;
+	element_bbox.width = bbox.width - BAR_WIDTH - DPAD - HPAD;
+	element_bbox.height = FONT_SIZE * 2 + PAD;
+	visible_elements_count = (bbox.height - DPAD) / (element_bbox.height + PAD);
 
 
 	/* Handle input */
@@ -140,141 +187,60 @@ void draw_list(Rectangle bbox, HGL_State* state, Palette palette)
 
 		if(hovering && wheel != 0)
 		{
-			state->offset -= wheel;
+			*offset -= wheel;
 
 			/* Down v */
 			if(wheel == -1) {
-				if(state->offset + visible_events_count >= state->events.count)
-					state->offset = state->events.count - visible_events_count - 1;
+				if(*offset + visible_elements_count >= elements_count)
+					*offset = elements_count - visible_elements_count - 1;
 			}
 
  			/* Up ^ */
 			if(wheel == 1) {
 				/* If offset overflows... */
-				if(state->offset >= state->events.count)
-					state->offset = 0;
+				if(*offset >= elements_count) *offset = 0;
 			}
 		}
 
-		if(IsKeyPressed(KEY_DOWN)) {
-			state->cevent_index++;
-			if(state->cevent_index >= state->events.count)
-				state->cevent_index = 0;
+		/* if(IsKeyPressed(KEY_DOWN)) { */
+		/* 	state->cevent_index++; */
+		/* 	if(state->cevent_index >= elements.count) */
+		/* 		state->cevent_index = 0; */
 
-			state->offset = clamp(0,
-					(state->cevent_index / visible_events_count) * visible_events_count,
-					state->events.count - visible_events_count);
-		}
+		/* 	state->offset = clamp(0, */
+		/* 			(state->cevent_index / visible_elements_count) * visible_elements_count, */
+		/* 			state->elements.count - visible_elements_count); */
+		/* } */
 
-		if(IsKeyPressed(KEY_UP)) {
-			state->cevent_index--;
-			if(state->cevent_index > state->events.count)
-				state->cevent_index = state->events.count - 1;
+		/* if(IsKeyPressed(KEY_UP)) { */
+		/* 	state->cevent_index--; */
+		/* 	if(state->cevent_index > state->elements.count) */
+		/* 		state->cevent_index = state->elements.count - 1; */
 
-			state->offset = clamp(0,
-					(state->cevent_index / visible_events_count) * visible_events_count,
-					state->events.count - visible_events_count);
-		}
+		/* 	state->offset = clamp(0, */
+		/* 			(state->cevent_index / visible_elements_count) * visible_elements_count, */
+		/* 			state->elements.count - visible_elements_count); */
+		/* } */
 	}
 
 
 	/* */
 	{
-		String* buffer = &state->buffer;
-
 		n16 i;
-		for(i = 0; i < visible_events_count + 1; ++i) {
-			n32 event_id = (i + state->offset) % state->events.count;
-			MEvent event = state->events.items[event_id];
+		for(i = 0; i < visible_elements_count + 1; ++i) {
+			n32 element_id = (i + *offset) % elements_count;
+			ViewState state = {0};
 
-			Color fcolor = palette.fcolor;
-			Color bcolor = palette.bcolor;
-
-			bool hovering;
-			bool selected;
-
-			event_bbox.y = PAD + (event_bbox.height + PAD) * i;
+			element_bbox.y = PAD + (element_bbox.height + PAD) * i;
 
 			/* Handle inputs */
-			hovering = CollisionPointRec(mouse, event_bbox);
-			if(hovering && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-				state->cevent_index = event_id;
-			}
-			selected = event_id <= state->cevent_index;
+			state.hovering = CollisionPointRec(mouse, bbox);
+			/* if(state.hovering && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) { */
+			/* 	state->cevent_index = element_id; */
+			/* } */
+			/* state.selected = element_id <= state->cevent_index; */
 
-
-			/* Draw background */
-			if(hovering) { fcolor = RED; bcolor = DARK_RED; }
-			if(selected) cinv(&fcolor, &bcolor);
-			DrawRectangleRec(event_bbox, bcolor);
-			DrawRectangleLinesEx(event_bbox, HBORD, selected ? bcolor : fcolor);
-
-
-			/* */
-			string_clear(buffer);
-
-			switch(event.type) {
-				case MALLOC:
-					/* #1 MALLOC 64B */
-					string_fmt(buffer, "#%u %s %dB", event_id,
-							EVENT_TYPE_LABEL[event.type], event.as.malloc.size);
-					break;
-
-				case REALLOC:
-					/* #1 REALLOC 0xABC 64B */
-					string_fmt(buffer, "#%u %s 0x%x %dB", event_id,
-							EVENT_TYPE_LABEL[event.type], event.as.realloc.fptr,
-							event.as.realloc.size);
-					break;
-
-				case CALLOC:
-					/* #1 CALLOC 1 64b */
-					string_fmt(buffer, "#%u %s %d %dB", event_id,
-							EVENT_TYPE_LABEL[event.type], event.as.calloc.memb,
-							event.as.calloc.size);
-					break;
-					/* 0xABCDEF0123 */
-
-				case FREE:
-					/* #1 FREE 0xABC */
-					string_fmt(buffer, "#%u %s 0x%x", event_id,
-							EVENT_TYPE_LABEL[event.type], event.as.free.ptr);
-					break;
-
-				default:
-					printf("event.type = %d\n", event.type);
-					assert(0);
-			}
-
-			DrawText(buffer->chars, event_bbox.x + HPAD, event_bbox.y + HPAD, FONT_SIZE, fcolor);
-
-			if(hovering) {
-				DrawText(event.file_line.chars, event_bbox.x + HPAD, event_bbox.y + FONT_SIZE + HPAD, FONT_SIZE, fcolor);
-			} else {
-				string_clear(buffer);
-
-				switch(event.type) {
-					case MALLOC:
-						string_fmt(buffer, "0x%x", event.as.malloc.rptr);
-						break;
-
-					case REALLOC:
-						string_fmt(buffer, "0x%x", event.as.realloc.rptr);
-						break;
-
-					case CALLOC:
-						string_fmt(buffer, "0x%x", event.as.calloc.rptr);
-						break;
-
-					case FREE:
-						string_fmt(buffer, "I'm FREEEEE");
-						break;
-
-					default: assert(0);
-				}
-
-				DrawText(buffer->chars, event_bbox.x + HPAD, event_bbox.y + FONT_SIZE + HPAD, FONT_SIZE, fcolor);
-			}
+			(*draw_element_func)(element_bbox, elements, element_id, state, palette);
 		}
 	}
 
@@ -288,8 +254,8 @@ void draw_list(Rectangle bbox, HGL_State* state, Palette palette)
 		box.y = PAD;
 		box.width = BAR_WIDTH;
 		box.height = bbox.height - DPAD;
-		draw_bar(box, &state->offset, state->events.count,
-				visible_events_count, palette);
+		draw_bar(box, offset, elements_count,
+				visible_elements_count, palette);
 
 		/* Clip content */
 		box.x = bbox.x;
@@ -319,14 +285,9 @@ void tick_fn(HGL_State* state) {
 	bbox.height = WINDOW_HEIGHT;
 	bbox.x = WINDOW_WIDTH - bbox.width;
 	bbox.y = 0;
-	draw_list(bbox, state, palette);
+	draw_list(bbox, &state->offset, &state->events.items,
+			state->events.count, draw_int, palette);
 
-	/* Draw event view */
-	bbox.x = 0;
-	bbox.y = FONT_SIZE + PAD + HPAD;
-	bbox.width = WINDOW_WIDTH - bbox.width + BORD;
-	bbox.height = WINDOW_HEIGHT - bbox.y;
-	draw_mainview(bbox, state, palette);
 
 	/* Extern border */
 	bbox.width = WINDOW_WIDTH;
@@ -337,10 +298,10 @@ void tick_fn(HGL_State* state) {
 
 
 #if DEBUG_ENABLE
-	ntos(fps_string, FPS_STR_LEN, (n64)GetFPS());
+	ntos(GetFPS(), FPS_STR_LEN, fps_string);
 	DrawText(fps_string, PAD, PAD, FONT_SIZE, CLR_DEBUG);
 
-	ntos(tick_string, TICK_STR_LEN, state->tick);
+	ntos(state->tick, TICK_STR_LEN, tick_string);
 	{
 		n8 text_width = MeasureText("2", FONT_SIZE) * strlen(tick_string);
 		DrawText(tick_string, WINDOW_WIDTH - 390 - DPAD - text_width,

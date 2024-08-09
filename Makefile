@@ -1,6 +1,6 @@
 # JustCoderdev Makefile for C projects v4 (no semv)
 
-PROGRAM_NAME = memdeb
+PROGRAM_NAME = PodcastApp
 
 # $(wildcard *.c)
 SRC_FILES = main.c hotreload.c

@@ -9,11 +9,19 @@ typedef struct Palette {
 	Color bcolor;
 } Palette;
 
+typedef struct Ints {
+	int* items;
+	n64 count;
+	n64 capacity;
+} Ints;
+
 typedef struct {
 	Palette palette;
 	n64 tick;
-
+	n64 offset;
+	Ints events;
 } HGL_State;
+
 
 extern error HGL_load(char* path);
 extern error HGL_reload(void);

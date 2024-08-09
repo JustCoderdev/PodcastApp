@@ -18,6 +18,7 @@ int nanosleep(const struct timespec *req, struct timespec *rem);
 #include <raylib.h>
 
 #define DL_PATH "libhotfile.so"
+#define HOTRELOAD_AUTO_ENABLED 0
 
 Color htoc(n32 hex) { /* 0x RR GG BB AA */
 	Color color = {0};
@@ -144,7 +145,10 @@ int main(int argc, char** argv) {
 	n64 tick = 0;
 
 	char* program = shift(&argv, &argc);
+
+#if HOTRELOAD_AUTO_ENABLED
 	int events_fd, watch_d;
+#endif
 
 	if(HGL_load(DL_PATH)) exit(failure);
 
@@ -152,19 +156,31 @@ int main(int argc, char** argv) {
 	InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Hello world MF!");
 	SetWindowState(FLAG_WINDOW_RESIZABLE);
 
+#if HOTRELOAD_AUTO_ENABLED
 	events_fd = inotify_setup();
 	watch_d = inotify_watch(events_fd, DL_PATH);
+#endif
 
 	HGL_init_fn(&state);
 	while(!WindowShouldClose()) {
-		if(IsKeyPressed(KEY_R) || inotify_pinged(events_fd)) {
+		if(IsKeyPressed(KEY_R)
+#if HOTRELOAD_AUTO_ENABLED
+			|| inotify_pinged(events_fd)
+#endif
+		) {
 			show_pending_screen();
+
+#if HOTRELOAD_AUTO_ENABLED
 			inotify_unwatch(events_fd, watch_d);
+#endif
 
 			if(HGL_reload())
 				exit(failure);
 
+#if HOTRELOAD_AUTO_ENABLED
 			watch_d = inotify_watch(events_fd, DL_PATH);
+#endif
+
 			continue;
 		}
 
