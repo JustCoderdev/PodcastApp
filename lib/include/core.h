@@ -44,36 +44,35 @@ typedef int Errno;
 /* Strings */
 typedef const char* CString;
 typedef struct String {
+	n32 count, capacity;
 	char* chars;
-	int count;
-	int capacity;
 } String;
 
 #define STR_FMT "%.*s"
 #define STR(STRING) (STRING).count, (STRING).chars
 
 #define string_new(STRING, CAPACITY) string_new_(STRING, CAPACITY, __FILE__, __LINE__)
-#define string_new_from(STRING, TEXT, TEXT_LEN) string_new_from_(STRING, TEXT, TEXT_LEN, __FILE__, __LINE__)
-#define string_from(STRING, TEXT, TEXT_LEN) string_from_(STRING, TEXT, TEXT_LEN, __FILE__, __LINE__)
-#define string_cpy(STRING, TEXT, TEXT_LEN) string_cpy_(STRING, TEXT, TEXT_LEN, __FILE__, __LINE__)
+#define string_new_from(STRING, TEXT_LEN, TEXT) string_new_from_(STRING, TEXT_LEN, TEXT, __FILE__, __LINE__)
+#define string_from(STRING, TEXT_LEN, TEXT) string_from_(STRING, TEXT_LEN, TEXT, __FILE__, __LINE__)
+#define string_cpy(STRING, TEXT_LEN, TEXT) string_cpy_(STRING, TEXT_LEN, TEXT, __FILE__, __LINE__)
 #define string_nterm(STRING) string_nterm_(STRING, __FILE__, __LINE__)
 #define string_append(STRING, CHR) string_append_(STRING, CHR, __FILE__, __LINE__)
 #define string_free(STRING) string_free_(STRING, __FILE__, __LINE__)
 
 /* TODO: use int instead of n64 and swap  char* with size */
-extern void string_new_(String* string, int capacity, char* file, int line);
-extern void string_new_from_(String* string, char* text, int text_len, char* file, int line);
-extern void string_from_(String* string, char* text, int text_len, char* file, int line);
+extern void string_new_(String* string, n32 capacity, char* file, int line);
+extern void string_new_from_(String* string, n32 text_len, char* text, char* file, int line);
+extern void string_from_(String* string, n32 text_len, char* text, char* file, int line);
 extern void string_nterm_(String* string, char* file, int line); /* Null terminate a string */
 extern void string_append_(String* string, char chr, char* file, int line);
 extern void string_free_(String* string, char* file, int line);
 
 extern void string_clear(String* string);
-extern void string_fmt(String* string, char* format, ...);
-extern void string_remove(String* string, int count);
+extern void string_fmt(String* string, CString format, ...);
+extern void string_remove(String* string, n32 count);
 
-extern bool string_equals(String strA, const char* strB, int strB_len);
-extern bool string_equallit(String strA, const char* const strB);
+extern bool string_equals(String strA, n32 strB_len, const char* strB);
+extern bool string_equallit(String strA, CString strB);
 
 /* Memory debug */
 #define dmalloc(SIZE)        malloc_(SIZE, __FILE__, __LINE__)
@@ -113,6 +112,10 @@ extern void core_log(CString level, /* CString color, */ CString file,
 
 #ifndef clamp
 #define clamp(MIN, VAL, MAX) ((VAL) <= (MIN) ? (MIN) : ((VAL) >= (MAX) ? (MAX) : (VAL)))
+#endif
+
+#ifndef pclamp /* positive clamp */
+#define pclamp(VAL, MAX) ((VAL) > (MAX) ? (MAX) : (VAL))
 #endif
 
 #ifndef oclamp /* overflow clamp */

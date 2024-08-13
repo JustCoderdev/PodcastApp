@@ -128,10 +128,10 @@ void draw_bar(Rectangle bbox, n64* progress, n64 total, n64 visible_items, Palet
 	DrawRectangleRec(cursor, palette.fcolor);
 }
 
-void swap(void* A, void* B) {
-	void* T = A;
-	A = B;
-	B = A;
+void swap(Color* A, Color* B) {
+	Color T = *A;
+	*A = *B;
+	*B = T;
 }
 
 typedef struct ViewState {
@@ -155,9 +155,10 @@ void draw_int(Rectangle bbox, void* elements, n64 element_id,
 	/* */
 	{
 		String buffer = {0};
-		int number = ((int*)elements)[element_id];
-		string_fmt(&buffer, "%d", number);
-		string_nterm(&buffer);
+		int number = (*(int**)elements)[element_id];
+
+		string_new(&buffer, 16);
+		string_fmt(&buffer, "%d - %d", element_id, number);
 
 		DrawText(buffer.chars, bbox.x + bbox.height / 2 - FONT_SIZE/2,
 				bbox.y + PAD, FONT_SIZE, fcolor);
@@ -167,7 +168,7 @@ void draw_int(Rectangle bbox, void* elements, n64 element_id,
 }
 
 void draw_list(Rectangle bbox, n64* offset, void* elements, n64 elements_count,
-               DrawElementFunc draw_element_func, Palette palette)
+		DrawElementFunc draw_element_func, Palette palette)
 {
 	Vector2 mouse = GetMousePosition();
 
@@ -234,7 +235,7 @@ void draw_list(Rectangle bbox, n64* offset, void* elements, n64 elements_count,
 			element_bbox.y = PAD + (element_bbox.height + PAD) * i;
 
 			/* Handle inputs */
-			state.hovering = CollisionPointRec(mouse, bbox);
+			state.hovering = CollisionPointRec(mouse, element_bbox);
 			/* if(state.hovering && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) { */
 			/* 	state->cevent_index = element_id; */
 			/* } */
